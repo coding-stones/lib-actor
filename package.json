@@ -1,6 +1,6 @@
 {
   "name": "lib-actors",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Simple actor implementations using Node workers",
   "main": "src/index.js",
   "repository": "https://github.com/orgs/coding-stones/lib-actors",

@@ -64,6 +64,12 @@ export function Worker(handlers) {
       const workerThread = await import('worker_threads')
       const caller = workerThread.parentPort
 
+      if (!caller) {
+        console.warn("Actor is not running in a worker. Running in test mode")
+        return
+      }
+
+
       const state = (handlers._initialize || localInitialize)()
 
       caller.on("message", (request) => {
