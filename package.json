@@ -6,7 +6,6 @@
   "repository": "https://github.com/orgs/coding-stones/lib-actors",
   "author": "@pragdave",
   "license": "MIT",
-  "type": "module",
   "devDependencies": {
     "baretest": "^2.0.0"
   }
