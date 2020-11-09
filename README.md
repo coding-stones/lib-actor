@@ -250,7 +250,7 @@ function _log(_actor, { name, msg }) {
 
 Run the code and you'll see:
 
-![Colored log output](./doc-images/gratuitously-colored-log.png)
+![Colored log output](https://github.com/coding-stones/lib-actor/blob/main/doc-images/gratuitously_colored_log.png?raw=true)
 
 ## Sending Messages Between Actors
 
