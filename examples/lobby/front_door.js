@@ -18,7 +18,7 @@ function customerLeaving(me, state, { id }) {
   me.log(`customer ${id} leaves the building`)
   state.processed++
   if (state.processed == state.count) {
-    me.postToDirector("done")
+    me.done("all customers have left the building")
   }
 }
 

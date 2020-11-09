@@ -10,7 +10,7 @@ $ ( npm import | yarn add ) https://github.com/coding-stones/lib-actor
 
 This is a simple implementation of actors using Web Workers (or Worker Threads in node).
 
-Each actor is an independent worker, with its own state. Actors commiunicate
+Each actor is an independent worker, with its own state. Actors communicate
 by sending messages.
 
 You define a _handler function_ for each message that an actor can receive.
@@ -144,7 +144,6 @@ $ node index.js
 { count: 12, sum: 78, average: 6.5 }
 { count: 15, sum: 120, average: 8 }
 { count: 18, sum: 171, average: 9.5 }
-^C
 ```
 What we see if the toplevel's `reportStats()` function displaying the messages
 it receives from the statistician actor.
@@ -237,7 +236,7 @@ will see a port named B (that sends messages to B) and vice versa.
 
 
 ``` javascript
-bankDoor.connectTo(lineForTellers)
+frontDoor.connectTo(lineForTellers)
 ```
 
 This establishes a bidirectional connection between the actors `frontDoor` and
@@ -255,7 +254,8 @@ The `lineForTeller` process would receive the `customerEntered` message.
 Included in that message's metadata would be a `_from` attribute, which could be
 used to reply.
 
-There's a full example with three interacting actors at the end of this README.
+There's a full example with three interacting actors at the [end of this
+README](#user-content-full-example).
 
 
 ### Special Handlers
@@ -267,8 +267,9 @@ application-specific handlers. Here's a list of these messages.
 
 * `_done`
 
-  Passed from an actor that calls `me.exit()`. The default implementation is
-  to terminate the worker that is running the actor.
+  Passed from an actor that calls `me.done()`. The default implementation is
+  to terminate the worker that is running the actor. And parameter passed to
+  `done()` will appear as the `reason` attribute of `_done` message. 
 
 * `_error`
 
@@ -513,7 +514,10 @@ function _afterEach(me, state, _) {
 }
 ```
 
+### To Do 
+
+[ ] currently only runs in node
 
 ### License
 
-See [license.md](./license.md)`
+See [license.md](./license.md)

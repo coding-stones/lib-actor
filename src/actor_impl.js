@@ -59,6 +59,10 @@ if (typeof fs) {  // ---------------------------------------------------------- 
     log(msg) {
       this.postToDirector("_log", { name: this.name, msg: msg })
     }
+
+    done(reason="OK") {
+      this.postToDirector("_done", { name: this.name, reason })
+    }
   }
 }
 else {

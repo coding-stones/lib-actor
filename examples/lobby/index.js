@@ -4,7 +4,7 @@ const line      = new Actor( "./waiting_line.js", "Line", { _actorRunning: doors
 
 const tellers   = [1,2,3].map(n => new Actor("./teller.js", `Teller ${n}`))
 
-const frontDoor = new Actor("./front_door.js", "Front door", { done })
+const frontDoor = new Actor("./front_door.js", "Front door", { _done })
 
 frontDoor.connectTo(line)
 tellers.forEach(teller => {
@@ -18,7 +18,7 @@ function doorsAreOpen() {
   frontDoor.post("start", {count: 5, rate: 1})
 }
 
-function done() {
+function _done() {
   console.log("all done")
   tellers.forEach(teller => teller.terminate())
   line.terminate()
