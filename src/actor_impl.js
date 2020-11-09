@@ -44,17 +44,14 @@ if (typeof fs) {  // ---------------------------------------------------------- 
     }
 
     postTo(name, type, payload) {
-      this.log(`post to ${name}: ${type}`)
       const channel = this._channels[name]
       if (!channel) {
         throw new Error("Unknown channel name: " + name)
       }
-      this.log(JSON.stringify({ _type: type, _from: name, payload }))
-      channel.postMessage({ _type: type, _from: name, payload })
+      channel.postMessage({ _type: type, _from: this.name, payload })
     }
 
     addChannel(port, name) {
-      this.log(`added channel ${name}`)
       this._channels[name] = port
       port.on("message", this.onMessageCallback)
     }
@@ -104,11 +101,6 @@ module.exports = function ActorImpl(messageHandlers) {
      handlers._unknownMessage(me, state, msg)
     }
   })
-
-  if (me.name)
-    me.postToDirector("_actorRunning", { payload: null })
-  else 
-    me.postToDirector("_actorWantsName", { payload: null })
 
   return me
 }

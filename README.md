@@ -10,11 +10,8 @@ $ ( npm import | yarn add ) https://github.com/coding-stones/lib-actor
 
 This is a simple implementation of actors using Web Workers (or Worker Threads in node).
 
-Each actor is an independent work, with its own state. You communicate with them
+Each actor is an independent worker, with its own state. Actors commiunicate
 by sending messages.
-
-In addition, the actor system adds a series of predefined messages that define
-housekeeping behaviors.
 
 You define a _handler function_ for each message that an actor can receive.
 Among other things, that handler function receives the current state and the
@@ -29,6 +26,7 @@ First, the [top-level code](./examples/stats/index.js) that uses the actor:
 const Actor = require("../../src/actor.js")
 
 const statistician = new Actor(
+  "Statistician",
   "./statistician.js",
   {
     stats: reportStats // this is defining both the type of an incoming message and the name of a handler
@@ -48,8 +46,8 @@ function reportStats(_actor, { count, sum, average }) {
 ```
 
 Line 3 creates a new actor. The first parameter is the name of the source file
-containing its code. This is followed by a map that enumerates the messages we
-expect to receive from the ac5tor and the name of the handler function to call
+containing its code. This is followed by the actor's name and a map that enumerates the messages we
+expect to receive _from_ the actor and the name of the handler function to call
 for each. In this case, there's only one message, `stats`, and it is handled by
 the function `reportStats`.
 
@@ -114,8 +112,8 @@ Notice we have a message called `_initialize`. Message types whose names start
 `_` are reserved. They are used by the library for managing actor lifecycle
 events, along with logging and other housekeeping.
 
-The `initialize` handler is called before the actor receives any other messages.
-Its job is to return the initial state (in this case a count and a sum). It you
+The `_initialize` handler is called before the actor receives any other messages.
+Its job is to return the initial state (in this case a count and a sum). If you
 don't implement an `initialize` callback, the state is set to an empty object.
 
 All callbacks in an actor (including the `_initialize` callback) are passed four parameters
@@ -173,47 +171,20 @@ If we run this (in the `examples/stats-logging` directory), we see the output:
 
 ``` session
 $ node index.js
-: #1 is 1
-: #2 is 2
-: #3 is 3
-{ count: 3, sum: 6, average: 2 }
-: #4 is 4
-: #5 is 5
-: #6 is 6
-{ count: 6, sum: 21, average: 3.5 }
-: #7 is 7
-   :  :  :
-```
-
-When you have lots of actors running, you'll need a way to differentiate log
-messages from each. Do this by setting the `name` attribute of the actor
-implementation object. This is often done in the `_initialize()` function, but
-can be done in any handler function (which means you can include actor specific
-state in the messages that `me.log()` generates). Here's how we set the name of
-the statistician actor:
-
-``` javascript
-function _initialize(me) {
-  me.name = "Statistician"    // <<< set the name
-  const state = {
-    count: 0,
-    sum: 0
-  }
-  return state
-}
-```
-
-And here's the log (run in `examples/stats-logging-name`):
-
-``` session
-$ node index.js
 Statistician: #1 is 1
 Statistician: #2 is 2
 Statistician: #3 is 3
 { count: 3, sum: 6, average: 2 }
 Statistician: #4 is 4
-   :        :
+Statistician: #5 is 5
+Statistician: #6 is 6
+{ count: 6, sum: 21, average: 3.5 }
+Statistician: #7 is 7
+   :  :  :
 ```
+
+When you have lots of actors running, you'll need a way to differentiate log
+messages from each. That's one of the uses of the actor's _name_: it appears in every log message.
 
 The `me.log()` function sends a `_log` message
 to the toplevel, which by default writes the payload to the console.
@@ -260,24 +231,24 @@ worker processes (our actors).
 
 To send messages between workers, you need to create a message channel, which
 has a port at each end. You then pass a port to one worker, the other port to
-the second worker, and then they can chat.
+the second worker, and then they can chat. These ports are given the name of the
+actor at the other end of the channel, so if actor A connects to actor B, then A
+will see a port named B (that sends messages to B) and vice versa.
 
-Eventually, this library may hide this from you. Until then, it makes it easy to
-connect two workers:
 
 ``` javascript
-bankDoor.connectTo(lineForTellers, "line")
+bankDoor.connectTo(lineForTellers)
 ```
 
 This establishes a bidirectional connection between the actors `frontDoor` and
-`lineForTeller` (maybe we're writing a bank lobby simulation). The connection is
-called `line`.
+`lineForTeller` (maybe we're writing a bank lobby simulation).
 
-If the `frontDoor` actor wants to send a new customer to the teller queue, it
+If the `frontDoor` actor wants to send a new customer to the teller queue, and
+the teller queue's name is "Line", it
 could use:
 
 ~~~ javascript
-me.postTo("line", "customerEntered", { id: custId })
+me.postTo("Line", "customerEntered", { id: custId })
 ~~~
 
 The `lineForTeller` process would receive the `customerEntered` message.
@@ -310,12 +281,6 @@ application-specific handlers. Here's a list of these messages.
   `name` (the actor name) and `msg`. The default behavior writes the name
   and message to the console.
 
-* `_actorWantsName`
-
-  If the name of an actor is not set in its `_initialize` handler, then it asks
-  the Director to give it a name. The Director responds by posting a
-  `yourNameIs` message to the actor. The default behaviour sets the name to the
-  filename of the module containing the actor code.
 
 * `_actorRunning`
 
@@ -391,7 +356,163 @@ When a teller is passed a customer, it waits for a period of time (which
 represents the time it takes to process the customer's business), and then posts
 a message to the waiting line saying that it is now idle.
 
-> todo
+The code is in `examples/lobby`. Run it using `node index.js`
+
+
+#### Main Program (index.js)
+
+``` javascript
+const Actor = require("../../src/actor")
+
+const line      = new Actor( "./waiting_line.js", "Line", { _actorRunning: doorsAreOpen })
+
+const tellers   = [1,2,3].map(n => new Actor("./teller.js", `Teller ${n}`))
+
+const frontDoor = new Actor("./front_door.js", "Front door", { done })
+
+frontDoor.connectTo(line)
+tellers.forEach(teller => {
+  teller.connectTo(line)
+  teller.connectTo(frontDoor)
+})
+
+tellers.forEach((teller, n) => teller.post("start", {id: n+1, serviceTime: 2 }))
+
+function doorsAreOpen() {
+  frontDoor.post("start", {count: 5, rate: 1})
+}
+
+function done() {
+  console.log("all done")
+  tellers.forEach(teller => teller.terminate())
+  line.terminate()
+  frontDoor.terminate()
+}
+```
+
+#### front_door.js 
+
+``` javascript
+const ActorImpl = require("../../src/actor_impl")
+
+ActorImpl({
+  start,
+  customerLeaving,
+})
+
+// set up the initial state
+function start(me, state, { count, rate }) {
+  me.name = "Front door"
+  startGenerating(me, count, rate)
+  state.count = count
+  state.processed = 0
+  return state
+}
+
+function customerLeaving(me, state, { id }) {
+  me.log(`customer ${id} leaves the building`)
+  state.processed++
+  if (state.processed == state.count) {
+    me.postToDirector("done")
+  }
+}
+
+function startGenerating(me, count, rate) {
+  let n = 1
+  const interval = 1/rate * 1000
+
+  function generate() {
+    me.log(`customer ${n} enters`)
+    me.postTo("Line", "customerEnters", {id: n++})
+    if (n <= count) {
+      setTimeout(generate, interval)
+    }
+  }
+  generate()
+
+}
+```
+
+#### teller.js 
+
+``` javascript
+const ActorImpl = require("../../src/actor_impl")
+
+ActorImpl({
+  start,
+  serveCustomer
+})
+
+// set up the initial state
+function start(me, state, options /* = { id, serviceTime }*/) {
+  tellerAvailable(me, options)
+  state.id = options.id
+  state.serviceTime = options.serviceTime
+  return state
+}
+
+function serveCustomer(me, state, { id }) {
+  me.log(`start serving customer ${id}`)
+  setTimeout(() => {
+    me.log(`finished with customer ${id}`)
+    tellerAvailable(me, state.id)
+    me.postTo("Front door", "customerLeaving", { id })
+  }, 
+  state.serviceTime*1000)
+}
+
+
+// helpers
+function tellerAvailable(me, id) {
+  me.log(`available`)
+  me.postTo("Line", "tellerAvailable", { id })
+}
+```
+
+#### waiting_line.js 
+
+``` javascript
+const ActorImpl = require("../../src/actor_impl")
+
+ActorImpl({
+  _initialize,
+  customerEnters,
+  tellerAvailable,
+  _afterEach
+})
+
+// set up the initial state
+function _initialize(me, _defaults, _params) {
+  const state = {
+    customersInLine: [],
+    availableTellers: []
+  }
+  return state
+}
+
+function customerEnters(me, state, { id }) {
+  me.log(`customer ${id} enters line`)
+  state.customersInLine.push(id)
+  return state
+}
+
+
+function tellerAvailable(me, state, msg, { _from }) {
+  state.availableTellers.push(_from)
+  return state
+}
+
+function _afterEach(me, state, _) {
+  if (state.customersInLine.length && state.availableTellers.length) {
+    const customer = state.customersInLine.shift()
+    const teller = state.availableTellers.shift()
+    me.log(`sending customer ${customer} to ${teller}`)
+    me.postTo(teller, "serveCustomer", {id: customer})
+  }
+  return state
+}
+```
+
 
 ### License
 

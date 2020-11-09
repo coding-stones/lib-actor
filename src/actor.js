@@ -9,14 +9,15 @@ if (typeof fs) {  // ---------------------------------------------------------- 
     throw new Error("You can't run the director in a worker thread")
 
   WorkerWrapper = class WorkerWrapper {
-    constructor(path) {
+    constructor(path, name) {
+      this.name = name
       this.worker = new Worker(path)
     }
 
     connectTo(otherWorker, connectionName) {
       const channel = new MessageChannel()
-      this.post("_channel", { port: channel.port1, name: connectionName }, [channel.port1])
-      otherWorker.post("_channel", { port: channel.port2, name: connectionName }, [channel.port2])
+      this.post("_channel", { port: channel.port1, name: otherWorker.name }, [channel.port1])
+      otherWorker.post("_channel", { port: channel.port2, name: this.name }, [channel.port2])
     }
 
     post(type, payload, transfer) {
@@ -74,11 +75,9 @@ else {
 
 module.exports = class Actor extends WorkerWrapper {
 
-  constructor(actorPath, messageHandlers) {
-    super(actorPath)
+  constructor(actorPath, name, messageHandlers) {
+    super(actorPath, name)
     const handlers = { ...DefaultHandlers, ...messageHandlers }
-
-    this.name = actorPath.replace(/\.\w+$/, "").replace(/^.*\//, "").replace(/_/g, " ")
 
     this.onMessage((m) => {
       const data = (m["data"] ? m.data : m) // handle both node and WS
@@ -97,6 +96,8 @@ module.exports = class Actor extends WorkerWrapper {
     this.onMessageError((m) => {
       handlers["_error"](this, { type: "messageerror", payload: m})
     })
+
+    giveActorName(this)
   }
 }
 
